@@ -1,0 +1,45 @@
+{
+  "name": "async-aid",
+  "version": "1.0.0",
+  "description": "Utilities for working with async functions",
+  "type": "module",
+  "main": "./dist/async-aid.mjs",
+  "exports": {
+    ".": {
+      "types": "./dist/async-aid.d.mts",
+      "default": "./dist/async-aid.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "lint": "eslint",
+    "test": "node --test",
+    "build": "rollup -c"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Amphiluke/async-aid.git"
+  },
+  "keywords": [
+    "async",
+    "utils",
+    "helpers",
+    "library"
+  ],
+  "author": "Amphiluke",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Amphiluke/async-aid/issues"
+  },
+  "homepage": "https://github.com/Amphiluke/async-aid#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.24.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "eslint": "^9.24.0",
+    "globals": "^16.0.0",
+    "rollup": "^4.40.0"
+  }
+}

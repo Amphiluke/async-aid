@@ -37,7 +37,16 @@ export function putPromise({fnKey, promiseKey = DEFAULT_KEY, promise}) {
  */
 export function deletePromise({fnKey, promiseKey = DEFAULT_KEY}) {
   const promiseMap = fnMap.get(fnKey);
-  if (!promiseMap?.delete(promiseKey)) {
+  if (!promiseMap) {
+    return false;
+  }
+  if (promiseKey === DEFAULT_KEY) {
+    const hadPromises = promiseMap.size > 0;
+    promiseMap.clear();
+    fnMap.delete(fnKey);
+    return hadPromises;
+  }
+  if (!promiseMap.delete(promiseKey)) {
     return false;
   }
   if (promiseMap.size < 1) {

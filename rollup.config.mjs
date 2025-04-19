@@ -1,4 +1,5 @@
 import terser from '@rollup/plugin-terser';
+import json from '@rollup/plugin-json';
 
 export default {
   input: 'src/index.mjs',
@@ -12,5 +13,8 @@ export default {
       format: 'es',
       plugins: [terser()],
     },
+  ],
+  plugins: [
+    json(),
   ],
 };

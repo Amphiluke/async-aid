@@ -73,6 +73,18 @@ describe('Cacher', () => {
     assert.strictEqual(asyncFn.mock.callCount(), 3);
   });
 
+  test('All-keys cache cleanup', async (context) => {
+    const asyncFn = context.mock.fn((a, b) => Promise.resolve(a + b));
+    const cacher = createCacher(asyncFn, {keyFn: (a, b) => `${typeof a}+${typeof b}`});
+    assert.strictEqual(resetCacher(cacher), false);
+    assert.strictEqual(await cacher(0, 1), 1);
+    assert.strictEqual(await cacher('00', '11'), '0011');
+    assert.strictEqual(resetCacher(cacher), true);
+    assert.strictEqual(await cacher(4, 5), 9);
+    assert.strictEqual(await cacher('44', '55'), '4455');
+    assert.strictEqual(asyncFn.mock.callCount(), 4);
+  });
+
   test('Prevent clearing of superseding cache', async (context) => {
     const resolvers = [Promise.withResolvers(), Promise.withResolvers(), Promise.withResolvers()];
     const asyncFn = context.mock.fn((index) => resolvers[index].promise);

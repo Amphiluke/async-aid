@@ -1,11 +1,12 @@
 /**
  * Creates a wrapper function that repeatedly calls the original async function until the latter succeeds or
  * until the allowed number of retries is exceeded.
- * @param {function} fn - Original function to retry on rejection
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Original function to retry on rejection
  * @param {object} [options={}] - Additional configuration
  * @param {number} [options.maxRetries=1] - Maximum allowed number of consecutive retry attempts
  * @param {number[]} [options.retryDelays=[0]] - Delays (in ms) before making attempts
- * @returns {(...*) => Promise<*>} Wrapper function (retryer)
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (retryer)
  */
 export function createRetryer(fn, {maxRetries = 1, retryDelays = [0]} = {}) {
   let attemptIndex = 0;

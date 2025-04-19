@@ -71,6 +71,19 @@ describe('Deduper', () => {
     assert.deepStrictEqual(asyncFn.mock.calls[2].arguments, ['44', '55']);
   });
 
+  test('All-keys lock removal', (context) => {
+    const asyncFn = context.mock.fn((a, b) => Promise.resolve(a + b));
+    const deduper = createDeduper(asyncFn, {keyFn: (a, b) => `${typeof a}+${typeof b}`});
+    assert.strictEqual(resetDeduper(deduper), false);
+    deduper(0, 1);
+    deduper('00', '11');
+    assert.strictEqual(asyncFn.mock.callCount(), 2);
+    assert.strictEqual(resetDeduper(deduper), true);
+    deduper(4, 5);
+    deduper('44', '55');
+    assert.strictEqual(asyncFn.mock.callCount(), 4);
+  });
+
   test('Prevent clearing of superseding dedupe lock', async (context) => {
     const resolvers = [Promise.withResolvers(), Promise.withResolvers(), Promise.withResolvers()];
     const asyncFn = context.mock.fn((index) => resolvers[index].promise);

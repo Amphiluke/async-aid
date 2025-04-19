@@ -1,3 +1,5 @@
+var version = "1.0.0";
+
 /** @type {WeakMap<function, Map<*, Promise>>} */
 const fnMap = new WeakMap();
 const DEFAULT_KEY = Symbol();
@@ -37,7 +39,16 @@ function putPromise({fnKey, promiseKey = DEFAULT_KEY, promise}) {
  */
 function deletePromise({fnKey, promiseKey = DEFAULT_KEY}) {
   const promiseMap = fnMap.get(fnKey);
-  if (!promiseMap?.delete(promiseKey)) {
+  if (!promiseMap) {
+    return false;
+  }
+  if (promiseKey === DEFAULT_KEY) {
+    const hadPromises = promiseMap.size > 0;
+    promiseMap.clear();
+    fnMap.delete(fnKey);
+    return hadPromises;
+  }
+  if (!promiseMap.delete(promiseKey)) {
     return false;
   }
   if (promiseMap.size < 1) {
@@ -49,11 +60,12 @@ function deletePromise({fnKey, promiseKey = DEFAULT_KEY}) {
 /**
  * Caches a promise returned by a function call so that repeated call attempts just return that cached promise
  * without relaunching the original function
- * @param {function} fn - Original function whose results need to be cached
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Original function whose results need to be cached
  * @param {object} [options={}] - Additional configuration
  * @param {boolean} [options.cacheRejection=false] - Whether to cache a rejected promise or not
  * @param {function} [options.keyFn] - Function that produces a distinct key to mark independent async processes
- * @returns {(...*) => Promise} Wrapper function (cacher)
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (cacher)
  */
 function createCacher(fn, {cacheRejection = false, keyFn} = {}) {
   const cacher = (...args) => {
@@ -90,10 +102,11 @@ function resetCacher(cacher, key) {
  * Creates a wrapper function that protects the original async function from repeated invocations while it is pending.
  * Every such repeated call gets the same pending promise produced by the first call. As soon as the currently pending
  * promise settles, the wrapper allows for a new call of the original function
- * @param {function} fn - Function to protect from repeated invocations while it is in pending state
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Function to protect from repeated invocations while it is in pending state
  * @param {object} [options] - Additional configuration
  * @param {function} [options.keyFn] - Function that produces a distinct key to mark independent async processes
- * @returns {(...*) => Promise} Wrapper function (deduper)
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (deduper)
  */
 function createDeduper(fn, {keyFn} = {}) {
   const deduper = (...args) => {
@@ -126,11 +139,12 @@ function resetDeduper(deduper, key) {
 /**
  * Creates a wrapper function that repeatedly calls the original async function until the latter succeeds or
  * until the allowed number of retries is exceeded.
- * @param {function} fn - Original function to retry on rejection
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Original function to retry on rejection
  * @param {object} [options={}] - Additional configuration
  * @param {number} [options.maxRetries=1] - Maximum allowed number of consecutive retry attempts
  * @param {number[]} [options.retryDelays=[0]] - Delays (in ms) before making attempts
- * @returns {(...*) => Promise<*>} Wrapper function (retryer)
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (retryer)
  */
 function createRetryer(fn, {maxRetries = 1, retryDelays = [0]} = {}) {
   let attemptIndex = 0;
@@ -155,10 +169,11 @@ const CODE_TIMED_OUT = Symbol('Timed out');
 /**
  * Creates a wrapper function that returns a rejected promise if execution of the original function takes longer
  * than the specified time limit
- * @param {function} fn - Original function
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Original function
  * @param {object} options - Additional configuration
  * @param {number} options.timeout - Time limit in ms
- * @returns {(...*) => Promise} Wrapper function (timekeeper)
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (timekeeper)
  */
 function createTimekeeper(fn, {timeout}) {
   return (...args) => new Promise((resolve, reject) => {
@@ -170,4 +185,6 @@ function createTimekeeper(fn, {timeout}) {
   });
 }
 
-export { CODE_TIMED_OUT, createCacher, createDeduper, createRetryer, createTimekeeper, resetCacher, resetDeduper };
+const VERSION = version;
+
+export { CODE_TIMED_OUT, VERSION, createCacher, createDeduper, createRetryer, createTimekeeper, resetCacher, resetDeduper };

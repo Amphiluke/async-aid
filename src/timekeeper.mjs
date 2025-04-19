@@ -3,10 +3,11 @@ export const CODE_TIMED_OUT = Symbol('Timed out');
 /**
  * Creates a wrapper function that returns a rejected promise if execution of the original function takes longer
  * than the specified time limit
- * @param {function} fn - Original function
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Original function
  * @param {object} options - Additional configuration
  * @param {number} options.timeout - Time limit in ms
- * @returns {(...*) => Promise} Wrapper function (timekeeper)
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (timekeeper)
  */
 export function createTimekeeper(fn, {timeout}) {
   return (...args) => new Promise((resolve, reject) => {

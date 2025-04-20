@@ -133,7 +133,7 @@ The logic for determining a cache key depending on the arguments can be as compl
 
 #### Synopsis
 
-For cases where manual cache invalidation is required, the library provides the special function `resetCacher()`. You can use it to clear internal cache storage of your cacher either selectively (on the key basis) or in its entirety.
+For cases where manual cache invalidation is required, the library provides a function `resetCacher()` specifically designed for this purpose. You can use it to clear internal cache storage of your cacher either selectively (on the key basis) or in its entirety.
 
 #### Simple cacher reset
 
@@ -159,7 +159,7 @@ window.addEventListener('languagechange', async () => {
 
 #### Key-based cacher reset
 
-If your cacher [maintains multiple caches](#maintaining-multiple-caches), you may also provide a distinct cache key as a second argument to clear cache for a specific key only. Not providing a key results in clearing the entire storage of your cacher.
+If your cacher [maintains multiple caches](#maintaining-multiple-caches), you may also provide a distinct cache key as a second argument to clear cache for this specific key only. Not providing a key results in clearing the entire storage of your cacher.
 
 ```javascript
 import {createCacher, resetCacher} from 'async-aid';
@@ -179,9 +179,96 @@ navigator.geolocation.watchPosition(({coords}) => {
     return;
   }
   hemisphere = newHemisphere;
-  // The user has crossed the hemisphere boundary!
-  // Clear caches for continents they don’t see anymore :D
+  // The user has crossed the hemisphere boundary! Get rid of irrelevant caches
   const resetCodes = hemisphere === 'western' ? ['AF', 'AS', 'EU'] : ['NA', 'SA'];
   resetCodes.forEach((code) => resetCacher(getCountriesByContinent, code));
 });
+```
+
+### `createDeduper()`
+
+#### Synopsis
+
+The `createDeduper()` API is somewhat similar to [`createCacher()`](#createcacher) in that it guards a user-defined async function by producing a wrapper async function, a *“deduper”*. The difference is that the deduper protects the original async function from repeated invocations *just while it is pending*. Every repeated call gets the same pending promise produced by the first call in the active queue. As soon as the currently pending promise settles, the wrapper allows for a new call of the original function.
+
+This technique is useful in cases where several independent parties may simultaneously access the same asynchronous API. Without appropriate measures, this may lead to request duplication. A deduper prevents this situation by allowing multiple callers to share the same pending promise.
+
+```javascript
+import {createDeduper} from 'async-aid';
+
+// We expect multiple parties to request the list of users at the same time
+const getUsers = createDeduper(async () => {
+  console.log('Fetching…');
+  const response = await fetch('/user-api/users');
+  return await response.json();
+});
+
+// Now we’ve avoided the situation of duplicated parallel requests.
+// Three calls below result in a single fetch request
+const [userList1, userList2, userList3] = await Promise.all([
+  getUsers(), // logs 'Fetching…' and sends a request
+  getUsers(), // logs nothing and doesn’t send a new request
+  getUsers(), // logs nothing and doesn’t send a new request
+]);
+
+console.assert(userList1 === userList2); // OK
+console.assert(userList2 === userList3); // OK
+
+// Here, no pending requests exist, so this initiates a new request
+const userList4 = await getUsers(); // logs 'Fetching…'
+```
+
+#### Key-based deduplication
+
+If you want your deduper to perform deduplication selectively based on the arguments it is passed, you’ll need to provide it with a *key function*, the concept you might remember from the [Cacher APIs documentation](#maintaining-multiple-caches). For example, we can enhance our fictional User API by allowing one to query a list of users with a specific role. The deduper will use the provided key function to differentiate logically independent async processes.
+
+```javascript
+import {createDeduper} from 'async-aid';
+
+const getUsersWithRole = createDeduper(async (role) => {
+  console.log(`Fetching: ${role}…`);
+  const response = await fetch(`/user-api/users?role=${role}`);
+  return await response.json();
+}, {
+  // Use role name as a distinct key
+  keyFn: (role) => role,
+});
+
+const [testers, qa, developers, programmers] = await Promise.all([
+  getUsersWithRole('tester'), // logs 'Fetching: tester…' and sends a request
+  getUsersWithRole('tester'), // logs nothing and doesn’t send a new request
+  getUsersWithRole('developer'), // logs 'Fetching: developer…' and sends a request
+  getUsersWithRole('developer'), // logs nothing and doesn’t send a new request
+]);
+
+console.assert(testers === qa); // OK
+console.assert(developers === programmers); // OK
+console.assert(testers !== developers); // OK
+```
+
+### `resetDeduper()`
+
+#### Synopsis
+
+The function `resetDeduper()` brings a deduper to the initial state by clearing currently active dedupe lock. For most cases, there are appropriate methods of lock removal, such as limiting the maximum allowed process duration (see [`createTimekeeper()`](#createtimekeeper)). But if you find yourself in that rare situation where you need to remove the lock without aborting currently pending process, `resetDeduper()` may be helpful.
+
+#### Types of dedupe lock removal
+
+In the simplest case, `resetDeduper()` expects a deduper reference as a single argument. This reverts the deduper state as a whole. If you use [key-based deduplication](#key-based-deduplication), you may provide a distinct key as the second (optional) argument to perform a selective dedupe lock removal.
+
+
+```javascript
+import {createDeduper, resetDeduper} from 'async-aid';
+
+const getUsersWithRole = createDeduper(async (role) => {
+  const response = await fetch(`/user-api/users?role=${role}`);
+  return await response.json();
+}, {
+  keyFn: (role) => role,
+});
+
+// ...
+
+resetDeduper(getUsersWithRole, 'tester'); // remove dedupe lock for a specific key
+resetDeduper(getUsersWithRole); // reset the deduper state entirely
 ```

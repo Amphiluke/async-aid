@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import {test, describe} from 'node:test';
+import {setImmediate} from 'node:timers/promises';
 import {createRetryer} from '../dist/async-aid.mjs';
 
 describe('Retryer', () => {
@@ -37,7 +38,7 @@ describe('Retryer', () => {
     const tickToCalls = [[0, 1], [500, 1], [500, 2], [3000, 2], [2000, 3], [4500, 3], [500, 4]];
     for (const [tick, callCount] of tickToCalls) {
       context.mock.timers.tick(tick);
-      await Promise.resolve();
+      await setImmediate();
       assert.strictEqual(asyncFn.mock.callCount(), callCount);
     }
   });
@@ -50,5 +51,15 @@ describe('Retryer', () => {
     assert.strictEqual(asyncFn.mock.callCount(), 4); // 1+3 attempts used but next call has 1+3 more
     assert.strictEqual(await retryer(), 'Ok, enough');
     assert.strictEqual(asyncFn.mock.callCount(), 8); // new 1+3 attempts used
+  });
+
+  test('User defined error checker', async (context) => {
+    const asyncFn = context.mock.fn((data) => Promise.reject(new Error(`Fail #${data.counter++}`)));
+    const retryer = createRetryer(asyncFn, {
+      maxRetries: 10,
+      canRetry: ({message}) => message !== 'Fail #3',
+    });
+    await assert.rejects(() => retryer({counter: 1}), {name: 'Error', message: 'Fail #3'});
+    assert.strictEqual(asyncFn.mock.callCount(), 3);
   });
 });

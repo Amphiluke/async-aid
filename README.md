@@ -1,6 +1,13 @@
 # async-aid
 
-This library is a set of utility functions, each providing specific sort of guards or tools for using in common scenarios where async functions are involved. These utilities work both on the server side (in the Node.js environment) and on the client side (in browsers).
+This library is a set of utility functions, each providing specific sort of guards or tools for using in common scenarios where async functions are involved. Primary use cases include:
+
+* caching the results of async function calls (memoisation),
+* deduplication of HTTP requests or other asynchronous operations,
+* automatic retrying the asyncronous operation in case of failure,
+* creating async functions with execution time limit.
+
+Utilities provided by `async-aid` work both on the server side (in the Node.js environment) and on the client side (in browsers).
 
 ## Installing
 
@@ -271,4 +278,106 @@ const getUsersWithRole = createDeduper(async (role) => {
 
 resetDeduper(getUsersWithRole, 'tester'); // remove dedupe lock for a specific key
 resetDeduper(getUsersWithRole); // reset the deduper state entirely
+```
+
+### `createRetryer()`
+
+#### Synopsis
+
+The `createRetryer()` API is designed for situations where an asynchronous operation should be repeated in case of failure. For that, `createRetryer()` creates a wrapper function (a *“retryer”*) that repeatedly calls the original async function until the latter succeeds or until the allowed number of retries is exceeded.
+
+```javascript
+import {createRetryer} from 'async-aid';
+
+const sendPerformanceInfo = createRetryer(async () => {
+  const response = await fetch('/analytics/performance', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: performance.toJSON(),
+  });
+  if (!response.ok) {
+    // Throw an error (or return a rejected promise) to retry the operation
+    throw new Error(response.statusText);
+  }
+});
+
+sendPerformanceInfo()
+  .then(() => console.info('Data sent!'))
+  .catch((reason) => console.warn('Failed to sent data!', reason));
+```
+
+#### Limiting the number of retries
+
+By default, a retryer makes only one retry attempt if the original function call fails. You can increase the maximum allowed number of attempts by providing the option `maxRetries`.
+
+```javascript
+import {createRetryer} from 'async-aid';
+
+const sendPerformanceInfo = createRetryer(async () => {
+  const response = await fetch('/analytics/performance', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: performance.toJSON(),
+  });
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+}, {maxRetries: 3});
+```
+
+#### Delays before retries
+
+Sometimes it is inappropriate or pointless to *immediately* repeat the operation after each unsuccessful attempt. A server will be overloaded if a large number of clients start sending request after request without delay. To avoid possible issues, you may want to add a delay before every retry.
+
+To do so, you provide an additional option `retryDelays`. The value of `retryDelays` is an array of numbers, where *i*-th number correspons to a delay (in ms) to add before *i*-th retry. If the array contains fewer elements than the number of attempts, then for each retry without a specified delay value, the last delay value is used.
+
+```javascript
+import {createRetryer} from 'async-aid';
+
+const sendPerformanceInfo = createRetryer(async () => {
+  const response = await fetch('/analytics/performance', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: performance.toJSON(),
+  });
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+}, {
+  maxRetries: 5,
+  retryDelays: [
+    1000, // wait 1s before the 1st retry
+    2000, // wait 2s before the 2nd retry
+    5000, // wait 5s before subsequent retries
+  ],
+});
+```
+
+#### User defined rejection tester
+
+Sometimes you need a way to make a retryer repeat the operation only when a particular condition is met (for example, retrying is only appropriate for a particular kind of rejection). This is where the dedicated option `canRetry` comes into play.
+
+Using the `canRetry` option, you can provide a custom logic for determining whether a retry is appropriate for the error thrown. This option can be assigned a function that accepts a rejection reason as an argument and returns `true` if a retry is possible, or `false` if not. This can also be an async function which allows you to fix whatever caused the rejection first.
+
+One of the possible applications of the Retryer API is the case of handling the [`401 Unauthorized`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/401) response. The server rejects the request but hints that the client can try again after (re-)authentication. So in this case we want to retry the operation when HTTP status code is 401 and only after re-authentication. The following snippet outlines a way to implement an API with re-authentication.
+
+```javascript
+import {createRetryer} from 'async-aid';
+
+const apiWithReAuth = createRetryer(async (url) => {
+  const response = await fetch(url);
+  return response.ok ? await response.json() : Promise.reject(response.status);
+}, {
+  canRetry: async (error) => {
+    if (error === 401) { // API call failed because of the expired access token
+      await reAuthenticate(); // your implementation of refreshing the access token
+      return true; // allow retryer make a new attempt
+    }
+    return false; // disallow retries for other types of error
+  },
+});
+
+apiWithReAuth('/user-api/users')
+  .then((result) => console.log('User list:', result))
+  .catch((error) => console.error('Failed with status', error));
 ```

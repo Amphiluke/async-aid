@@ -19,6 +19,7 @@ export function resetDeduper<F extends AnyFn>(deduper: FnWrapper<F>, key?: NonNu
 type RetryerOptions = {
   maxRetries?: number;
   retryDelays?: number[];
+  canRetry?: (error: any) => (boolean | Promise<boolean>);
 };
 export function createRetryer<F extends AnyFn>(fn: F, options?: RetryerOptions): FnWrapper<F>;
 

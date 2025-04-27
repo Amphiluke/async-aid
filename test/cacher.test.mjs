@@ -86,7 +86,14 @@ describe('Cacher', () => {
   });
 
   test('Prevent clearing of superseding cache', async (context) => {
-    const resolvers = [Promise.withResolvers(), Promise.withResolvers(), Promise.withResolvers()];
+    const withResolvers = Promise.withResolvers ?
+      () => Promise.withResolvers() :
+      () => {
+        const result = {};
+        result.promise = new Promise((resolve, reject) => Object.assign(result, {resolve, reject}));
+        return result;
+      };
+    const resolvers = [withResolvers(), withResolvers(), withResolvers()];
     const asyncFn = context.mock.fn((index) => resolvers[index].promise);
     const cacher = createCacher(asyncFn);
     cacher(0); // cache the first promise

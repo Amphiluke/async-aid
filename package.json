@@ -16,6 +16,9 @@
     "dist",
     "src"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "lint": "eslint",
     "test": "node --test",
@@ -27,6 +30,10 @@
   },
   "keywords": [
     "async",
+    "deduplication",
+    "memoization",
+    "rerty",
+    "timeout",
     "utils",
     "helpers",
     "library"

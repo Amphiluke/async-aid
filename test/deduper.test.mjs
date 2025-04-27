@@ -85,7 +85,14 @@ describe('Deduper', () => {
   });
 
   test('Prevent clearing of superseding dedupe lock', async (context) => {
-    const resolvers = [Promise.withResolvers(), Promise.withResolvers(), Promise.withResolvers()];
+    const withResolvers = Promise.withResolvers ?
+      () => Promise.withResolvers() :
+      () => {
+        const result = {};
+        result.promise = new Promise((resolve, reject) => Object.assign(result, {resolve, reject}));
+        return result;
+      };
+    const resolvers = [withResolvers(), withResolvers(), withResolvers()];
     const asyncFn = context.mock.fn((index) => resolvers[index].promise);
     const deduper = createDeduper(asyncFn);
     deduper(0); // set lock to the first promise

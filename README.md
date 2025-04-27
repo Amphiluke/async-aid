@@ -381,3 +381,38 @@ apiWithReAuth('/user-api/users')
   .then((result) => console.log('User list:', result))
   .catch((error) => console.error('Failed with status', error));
 ```
+
+### `createTimekeeper()`
+
+#### Synopsis
+
+Some modern Web APIs support cancelling an asynchronous process via the [AbortSignal API](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). Particularly, using `AbortSignal.timeout()` allows for aborting an operation after a specified time. For custom scenarios not covered by the standard API capabilities, you have to create your own implementations based on timers.
+
+The `createTimekeeper()` guard provides a simple way to wrap any async function with a promise that will automatically reject after a specified time.
+
+#### Using the Timekeeper API
+
+Check out the following example where a payment process is configured to abort automatically after 10 minutes if the user abandons it. Notice the usage of the unique symbol `CODE_TIMED_OUT` to distinguish a timeout rejection from other possible rejection reasons.
+
+```javascript
+import {createTimekeeper, CODE_TIMED_OUT} from 'async-aid';
+
+const payRequest = new PaymentRequest(methodData, details, options);
+const launchPayment = createTimekeeper(async () => {
+  return await payRequest.show();
+}, {
+  timeout: 10 * 60 * 1000, // 10 minutes
+});
+
+document.querySelector('#pay-btn').addEventListener('click', async () => {
+  try {
+    await launchPayment();
+  } catch (error) {
+    if (error === CODE_TIMED_OUT) {
+      // Timekeeper reported a timeout, trying to abort abandoned payment
+      payRequest.abort()
+        .catch(() => console.info('Payment is not really abandoned'));
+    }
+  }
+});
+```

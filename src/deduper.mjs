@@ -1,4 +1,4 @@
-import {getPromise, putPromise, deletePromise} from './promise-store.mjs';
+import {getEntity, putEntity, deleteEntity} from './entity-store.mjs';
 
 /**
  * Creates a wrapper function that protects the original async function from repeated invocations while it is pending.
@@ -12,17 +12,17 @@ import {getPromise, putPromise, deletePromise} from './promise-store.mjs';
  */
 export function createDeduper(fn, {keyFn} = {}) {
   const deduper = (...args) => {
-    const promiseKey = keyFn?.(...args);
-    const pendingPromise = getPromise({fnKey: deduper, promiseKey});
+    const entityKey = keyFn?.(...args);
+    const pendingPromise = getEntity({fnKey: deduper, entityKey});
     if (pendingPromise) {
       return pendingPromise;
     }
     const promise = Promise.resolve(fn(...args)).finally(() => {
-      if (getPromise({fnKey: deduper, promiseKey}) === promise) { // precaution against clearing of superseding dedupe lock
-        deletePromise({fnKey: deduper, promiseKey});
+      if (getEntity({fnKey: deduper, entityKey}) === promise) { // precaution against clearing of superseding dedupe lock
+        deleteEntity({fnKey: deduper, entityKey});
       }
     });
-    putPromise({fnKey: deduper, promiseKey, promise});
+    putEntity({fnKey: deduper, entityKey, entity: promise});
     return promise;
   };
   return deduper;
@@ -35,5 +35,5 @@ export function createDeduper(fn, {keyFn} = {}) {
  * @returns {boolean} `true` if the dedupe lock was successfully removed, or `false` if no active lock existed
  */
 export function resetDeduper(deduper, key) {
-  return deletePromise({fnKey: deduper, promiseKey: key});
+  return deleteEntity({fnKey: deduper, entityKey: key});
 }

@@ -23,6 +23,11 @@ type RetryerOptions = {
 };
 export function createRetryer<F extends AnyFn>(fn: F, options?: RetryerOptions): FnWrapper<F>;
 
+type SupersederOptions<F extends AnyFn> = {
+  keyFn?: KeyFn<F>;
+};
+export function createSuperseder<F extends AnyFn>(fn: F, options?: SupersederOptions<F>): FnWrapper<F>;
+
 type TimeKeeperOptions = {
   timeout: number;
 };

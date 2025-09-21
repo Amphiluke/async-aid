@@ -1,57 +1,57 @@
-var version = "1.0.0";
+var version = "1.1.0";
 
-/** @type {WeakMap<function, Map<*, Promise>>} */
+/** @type {WeakMap<function, Map<*, object>>} */
 const fnMap = new WeakMap();
 const DEFAULT_KEY = Symbol();
 
 /**
- * Get a promise from the store
+ * Get an entity from the store
  * @param {object} options
  * @param {function} options.fnKey - Function used as a key in the store
- * @param {*} [options.promiseKey] - Key in the promise map
- * @returns {Promise | undefined}
+ * @param {*} [options.entityKey] - Key in the entity map
+ * @returns {object | undefined}
  */
-function getPromise({fnKey, promiseKey = DEFAULT_KEY}) {
-  return fnMap.get(fnKey)?.get(promiseKey);
+function getEntity({fnKey, entityKey = DEFAULT_KEY}) {
+  return fnMap.get(fnKey)?.get(entityKey);
 }
 
 /**
- * Write a promise to the store
+ * Write an entity to the store
  * @param {object} options
  * @param {function} options.fnKey - Function used as a key in the store
- * @param {*} [options.promiseKey] - Key in the promise map
- * @param {Promise} options.promise - Promise instance to put into the store
+ * @param {*} [options.entityKey] - Key in the entity map
+ * @param {object} options.entity - Entity to put into the store
  */
-function putPromise({fnKey, promiseKey = DEFAULT_KEY, promise}) {
+function putEntity({fnKey, entityKey = DEFAULT_KEY, entity}) {
   if (fnMap.has(fnKey)) {
-    fnMap.get(fnKey).set(promiseKey, promise);
+    fnMap.get(fnKey).set(entityKey, entity);
   } else {
-    fnMap.set(fnKey, new Map([[promiseKey, promise]]));
+    fnMap.set(fnKey, new Map([[entityKey, entity]]));
   }
 }
 
 /**
- * Delete a promise from the store
+ * Delete an entity from the store
  * @param {object} options
  * @param {function} options.fnKey - Function used as a key in the store
- * @param {*} [options.promiseKey] - Key in the promise map
- * @returns {boolean} `true` if the promise was successfully deleted, or `false` if no promise found
+ * @param {*} [options.entityKey] - Key in the entity map
+ * @returns {boolean} `true` if the entity was successfully deleted, or `false` if no entity found
  */
-function deletePromise({fnKey, promiseKey = DEFAULT_KEY}) {
-  const promiseMap = fnMap.get(fnKey);
-  if (!promiseMap) {
+function deleteEntity({fnKey, entityKey = DEFAULT_KEY}) {
+  const entityMap = fnMap.get(fnKey);
+  if (!entityMap) {
     return false;
   }
-  if (promiseKey === DEFAULT_KEY) {
-    const hadPromises = promiseMap.size > 0;
-    promiseMap.clear();
+  if (entityKey === DEFAULT_KEY) {
+    const hadEntities = entityMap.size > 0;
+    entityMap.clear();
     fnMap.delete(fnKey);
-    return hadPromises;
+    return hadEntities;
   }
-  if (!promiseMap.delete(promiseKey)) {
+  if (!entityMap.delete(entityKey)) {
     return false;
   }
-  if (promiseMap.size < 1) {
+  if (entityMap.size < 1) {
     fnMap.delete(fnKey);
   }
   return true;
@@ -69,20 +69,20 @@ function deletePromise({fnKey, promiseKey = DEFAULT_KEY}) {
  */
 function createCacher(fn, {cacheRejection = false, keyFn} = {}) {
   const cacher = (...args) => {
-    const promiseKey = keyFn?.(...args);
-    const cachedPromise = getPromise({fnKey: cacher, promiseKey});
+    const entityKey = keyFn?.(...args);
+    const cachedPromise = getEntity({fnKey: cacher, entityKey});
     if (cachedPromise) {
       return cachedPromise;
     }
     const promise = Promise.resolve(fn(...args));
     if (!cacheRejection) {
       promise.catch(() => {
-        if (getPromise({fnKey: cacher, promiseKey}) === promise) { // precaution against clearing of superseding cached promise
-          deletePromise({fnKey: cacher, promiseKey});
+        if (getEntity({fnKey: cacher, entityKey}) === promise) { // precaution against clearing of superseding cached promise
+          deleteEntity({fnKey: cacher, entityKey});
         }
       });
     }
-    putPromise({fnKey: cacher, promiseKey, promise});
+    putEntity({fnKey: cacher, entityKey, entity: promise});
     return promise;
   };
   return cacher;
@@ -95,7 +95,7 @@ function createCacher(fn, {cacheRejection = false, keyFn} = {}) {
  * @returns {boolean} `true` if cache was successfully cleared, or `false` if nothing was cached
  */
 function resetCacher(cacher, key) {
-  return deletePromise({fnKey: cacher, promiseKey: key});
+  return deleteEntity({fnKey: cacher, entityKey: key});
 }
 
 /**
@@ -110,17 +110,17 @@ function resetCacher(cacher, key) {
  */
 function createDeduper(fn, {keyFn} = {}) {
   const deduper = (...args) => {
-    const promiseKey = keyFn?.(...args);
-    const pendingPromise = getPromise({fnKey: deduper, promiseKey});
+    const entityKey = keyFn?.(...args);
+    const pendingPromise = getEntity({fnKey: deduper, entityKey});
     if (pendingPromise) {
       return pendingPromise;
     }
     const promise = Promise.resolve(fn(...args)).finally(() => {
-      if (getPromise({fnKey: deduper, promiseKey}) === promise) { // precaution against clearing of superseding dedupe lock
-        deletePromise({fnKey: deduper, promiseKey});
+      if (getEntity({fnKey: deduper, entityKey}) === promise) { // precaution against clearing of superseding dedupe lock
+        deleteEntity({fnKey: deduper, entityKey});
       }
     });
-    putPromise({fnKey: deduper, promiseKey, promise});
+    putEntity({fnKey: deduper, entityKey, entity: promise});
     return promise;
   };
   return deduper;
@@ -133,7 +133,7 @@ function createDeduper(fn, {keyFn} = {}) {
  * @returns {boolean} `true` if the dedupe lock was successfully removed, or `false` if no active lock existed
  */
 function resetDeduper(deduper, key) {
-  return deletePromise({fnKey: deduper, promiseKey: key});
+  return deleteEntity({fnKey: deduper, entityKey: key});
 }
 
 /**
@@ -168,6 +168,41 @@ function createRetryer(fn, {maxRetries = 1, retryDelays = [0], canRetry} = {}) {
   return retryer;
 }
 
+/**
+ * Creates a wrapper function that returns a promise. If the wrapper is called multiple times while a previous call
+ * is still pending, only the most recent call’s result is used. All pending promises settle with the result or error
+ * of the latest call.
+ * @template T - Awaited type of the original function
+ * @param {(...args: *[]) => (T | Promise<T>)} fn - Original function
+ * @param {object} [options] - Additional configuration
+ * @param {function} [options.keyFn] - Function that produces a distinct key to mark independent async processes
+ * @returns {(...args: *[]) => Promise<T>} Wrapper function (superseder)
+ */
+function createSuperseder(fn, {keyFn} = {}) {
+  const superseder = (...args) => new Promise((resolve, reject) => {
+    const entityKey = keyFn?.(...args);
+    const settlers = getEntity({fnKey: superseder, entityKey}) ?? [];
+    settlers.push({resolve, reject});
+    putEntity({fnKey: superseder, entityKey, entity: settlers});
+    Promise.resolve(fn(...args))
+      .then((result) => {
+        const settlers = getEntity({fnKey: superseder, entityKey});
+        if (resolve === settlers?.at(-1).resolve) {
+          settlers.forEach((settler) => settler.resolve(result));
+          deleteEntity({fnKey: superseder, entityKey});
+        }
+      })
+      .catch((reason) => {
+        const settlers = getEntity({fnKey: superseder, entityKey});
+        if (reject === settlers?.at(-1).reject) {
+          settlers.forEach((settler) => settler.reject(reason));
+          deleteEntity({fnKey: superseder, entityKey});
+        }
+      });
+  });
+  return superseder;
+}
+
 const CODE_TIMED_OUT = Symbol('Timed out');
 
 /**
@@ -191,4 +226,4 @@ function createTimekeeper(fn, {timeout}) {
 
 const VERSION = version;
 
-export { CODE_TIMED_OUT, VERSION, createCacher, createDeduper, createRetryer, createTimekeeper, resetCacher, resetDeduper };
+export { CODE_TIMED_OUT, VERSION, createCacher, createDeduper, createRetryer, createSuperseder, createTimekeeper, resetCacher, resetDeduper };

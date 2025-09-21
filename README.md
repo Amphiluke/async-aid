@@ -382,6 +382,65 @@ apiWithReAuth('/user-api/users')
   .catch((error) => console.error('Failed with status', error));
 ```
 
+### `createSuperseder()`
+
+#### Synopsis
+
+The “Superseder” API can be handy in situations where two or more *“identical”* requests may be executed concurrently, resulting in a race condition. Typically, in such situations, only the result of the most recent request is of interest, while other concurrent requests return stale data that should be ignored. Like other utilities in the library, the `createSuperseder()` guard creates a wrapper function (a *“superseder”*) that returns a promise. If such a superseder is called multiple times while previous calls are still pending, only the result of the most recent call is used. All pending promises get settled with the result or error of the latest call.
+
+```javascript
+import {createSuperseder} from 'async-aid';
+
+// Fetch and return fresh data for a dashboard view
+const getDashboardData = createSuperseder(async () => {
+  const response = await fetch('/dashboards/main');
+  return await response.json();  
+});
+
+const refreshDashboard = async () => {
+  // Using a superseder to ensure that all concurrent calls
+  // get the same (most up-to-date) data
+  dashboardStore.$patch(await getDashboardData());
+};
+
+// There are a number of independent triggers that initiate a dashbord refresh…
+document.getElementById('refreshBtn').addEventListener('click', refreshDashboard);
+
+new BroadcastChannel('dashboard').addEventListener('message', ({data}) => {
+  if (data === 'forced-sync') {
+    refreshDashboard();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    refreshDashboard();
+  }
+});
+```
+
+#### Key-based superseding
+
+A superseder can also be made “more selective” based on the arguments it is passed. For that, you’ll need to provide it with a *key function*, the concept you might remember from the [Cacher APIs documentation](#maintaining-multiple-caches). Processes identified differently by a key function do not affect each other when executed in parallel by the same superseder.
+
+```javascript
+import {createSuperseder} from 'async-aid';
+
+// Fetch and return fresh data for a specific dashboard view
+const getDashboardData = createSuperseder(async (dashboardName) => {
+  const response = await fetch(`/dashboards/${dashboardName}`);
+  return await response.json();  
+}, {
+  // Use dashboard name as a distinct key
+  keyFn: (dashboardName) => dashboardName,
+});
+
+const refreshDashboard = async (dashboardName) => {
+  // Now different dashboards are refreshed independently of each other
+  dashboardStore.$patch({[dashboardName]: await getDashboardData()});
+};
+```
+
 ### `createTimekeeper()`
 
 #### Synopsis

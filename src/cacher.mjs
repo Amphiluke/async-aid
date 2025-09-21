@@ -1,4 +1,4 @@
-import {getPromise, putPromise, deletePromise} from './promise-store.mjs';
+import {getEntity, putEntity, deleteEntity} from './entity-store.mjs';
 
 /**
  * Caches a promise returned by a function call so that repeated call attempts just return that cached promise
@@ -12,20 +12,20 @@ import {getPromise, putPromise, deletePromise} from './promise-store.mjs';
  */
 export function createCacher(fn, {cacheRejection = false, keyFn} = {}) {
   const cacher = (...args) => {
-    const promiseKey = keyFn?.(...args);
-    const cachedPromise = getPromise({fnKey: cacher, promiseKey});
+    const entityKey = keyFn?.(...args);
+    const cachedPromise = getEntity({fnKey: cacher, entityKey});
     if (cachedPromise) {
       return cachedPromise;
     }
     const promise = Promise.resolve(fn(...args));
     if (!cacheRejection) {
       promise.catch(() => {
-        if (getPromise({fnKey: cacher, promiseKey}) === promise) { // precaution against clearing of superseding cached promise
-          deletePromise({fnKey: cacher, promiseKey});
+        if (getEntity({fnKey: cacher, entityKey}) === promise) { // precaution against clearing of superseding cached promise
+          deleteEntity({fnKey: cacher, entityKey});
         }
       });
     }
-    putPromise({fnKey: cacher, promiseKey, promise});
+    putEntity({fnKey: cacher, entityKey, entity: promise});
     return promise;
   };
   return cacher;
@@ -38,5 +38,5 @@ export function createCacher(fn, {cacheRejection = false, keyFn} = {}) {
  * @returns {boolean} `true` if cache was successfully cleared, or `false` if nothing was cached
  */
 export function resetCacher(cacher, key) {
-  return deletePromise({fnKey: cacher, promiseKey: key});
+  return deleteEntity({fnKey: cacher, entityKey: key});
 }

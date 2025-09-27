@@ -192,6 +192,8 @@ navigator.geolocation.watchPosition(({coords}) => {
 });
 ```
 
+---
+
 ### `createDeduper()`
 
 #### Synopsis
@@ -279,6 +281,8 @@ const getUsersWithRole = createDeduper(async (role) => {
 resetDeduper(getUsersWithRole, 'tester'); // remove dedupe lock for a specific key
 resetDeduper(getUsersWithRole); // reset the deduper state entirely
 ```
+
+---
 
 ### `createRetryer()`
 
@@ -382,6 +386,8 @@ apiWithReAuth('/user-api/users')
   .catch((error) => console.error('Failed with status', error));
 ```
 
+---
+
 ### `createSuperseder()`
 
 #### Synopsis
@@ -432,6 +438,8 @@ new EventSource('/data.php').addEventListener('update', async ({data}) => {
   });
 });
 ```
+
+---
 
 ### `createTimekeeper()`
 

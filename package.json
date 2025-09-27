@@ -50,6 +50,6 @@
     "@rollup/plugin-terser": "^0.4.4",
     "eslint": "^9.36.0",
     "globals": "^16.4.0",
-    "rollup": "^4.52.0"
+    "rollup": "^4.52.3"
   }
 }

@@ -388,34 +388,24 @@ apiWithReAuth('/user-api/users')
 
 The “Superseder” API can be handy in situations where two or more *“identical”* requests may be executed concurrently, resulting in a race condition. Typically, in such situations, only the result of the most recent request is of interest, while other concurrent requests return stale data that should be ignored. Like other utilities in the library, the `createSuperseder()` guard creates a wrapper function (a *“superseder”*) that returns a promise. If such a superseder is called multiple times while previous calls are still pending, only the result of the most recent call is used. All pending promises get settled with the result or error of the latest call.
 
+As an example, let’s imagine we have a function that fetches aggregated data for plotting a composite dashboard. There are also various events that independently trigger dashboard updates. If multiple events can fire “simultaneously”, causing a race condition, it seems reasonable to use the “Superseder” API, so that we can ensure our dashboard always displays the most recent data.
+
 ```javascript
 import {createSuperseder} from 'async-aid';
 
-// Fetch and return fresh data for a dashboard view
+// Fetch and return fresh aggregated data for an composite dashboard view
 const getDashboardData = createSuperseder(async () => {
-  const response = await fetch('/dashboards/main');
+  const response = await fetch('/dashboards/aggregated');
   return await response.json();  
 });
 
-const refreshDashboard = async () => {
+// Listening to server-sent notifications on data updates
+new EventSource('/data.php').addEventListener('update', async () => {
   // Using a superseder to ensure that all concurrent calls
   // get the same (most up-to-date) data
-  dashboardStore.$patch(await getDashboardData());
-};
-
-// There are a number of independent triggers that initiate a dashbord refresh…
-document.getElementById('refreshBtn').addEventListener('click', refreshDashboard);
-
-new BroadcastChannel('dashboard').addEventListener('message', ({data}) => {
-  if (data === 'forced-sync') {
-    refreshDashboard();
-  }
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    refreshDashboard();
-  }
+  dashboardDataStore.$patch({
+    aggregated: await getDashboardData(),
+  });
 });
 ```
 
@@ -427,18 +417,20 @@ A superseder can also be made “more selective” based on the arguments it is 
 import {createSuperseder} from 'async-aid';
 
 // Fetch and return fresh data for a specific dashboard view
-const getDashboardData = createSuperseder(async (dashboardName) => {
-  const response = await fetch(`/dashboards/${dashboardName}`);
+const getDashboardData = createSuperseder(async (category) => {
+  const response = await fetch(`/dashboards/${category}`);
   return await response.json();  
 }, {
-  // Use dashboard name as a distinct key
-  keyFn: (dashboardName) => dashboardName,
+  // Use data category identifier as a distinct key
+  keyFn: (category) => category,
 });
 
-const refreshDashboard = async (dashboardName) => {
+new EventSource('/data.php').addEventListener('update', async ({data}) => {
   // Now different dashboards are refreshed independently of each other
-  dashboardStore.$patch({[dashboardName]: await getDashboardData()});
-};
+  dashboardDataStore.$patch({
+    [data.category]: await getDashboardData(data.category),
+  });
+});
 ```
 
 ### `createTimekeeper()`

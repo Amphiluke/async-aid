@@ -5,6 +5,7 @@ This library is a set of utility functions, each providing specific sort of guar
 * caching the results of async function calls (memoisation),
 * deduplication of HTTP requests or other asynchronous operations,
 * automatic retrying the asyncronous operation in case of failure,
+* execution of concurrent asynchronous operations in superseding mode based on the launch time,
 * creating async functions with execution time limit.
 
 Utilities provided by `async-aid` work both on the server side (in the Node.js environment) and on the client side (in browsers).

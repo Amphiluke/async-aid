@@ -43,7 +43,7 @@
   "bugs": {
     "url": "https://github.com/Amphiluke/async-aid/issues"
   },
-  "homepage": "https://github.com/Amphiluke/async-aid#readme",
+  "homepage": "https://github.com/Amphiluke/async-aid/wiki",
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@rollup/plugin-json": "^6.1.0",
